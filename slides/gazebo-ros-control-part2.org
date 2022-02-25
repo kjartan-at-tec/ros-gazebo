@@ -1,0 +1,270 @@
+#+OPTIONS: toc:nil 
+#+BEAMER_FRAME_LEVEL: 2
+# #+LaTeX_CLASS: koma-article 
+#+LaTeX_CLASS: beamer
+#+LaTeX_CLASS_OPTIONS: [presentation,aspectratio=1610]
+#+BEAMER_THEME: default
+#+OPTIONS: H:2
+#+LaTeX_HEADER: \usepackage{khpreamble}
+#+LaTeX_HEADER: \usepackage{algorithm}
+#+LaTeX_HEADER: \usepackage{hyperref}
+#+LaTeX_HEADER: \usepackage{framed}
+#+LaTeX_HEADER: \usepackage[noend]{algpseudocode}
+#+LaTeX_HEADER: \usepackage{tikz,pgf}
+#+LaTeX_HEADER: \usetikzlibrary{shapes.geometric}
+
+#+LaTeX_HEADER: \newcommand{\sign}{\mathrm{sign}}
+#+LaTeX_HEADER: \renewcommand{\transp}{^{\mathrm{T}}}
+#+LaTeX_HEADER: \DeclareMathOperator*{\argmin}{arg\,min}
+#+LaTeX_HEADER: \DeclareMathOperator*{\argmax}{arg\,max}
+#+LaTeX_HEADER: \DeclareMathOperator*{\EXP}{E}
+#+LaTeX_HEADER: \DeclareMathOperator*{\COV}{cov}
+#+LaTeX_HEADER: \definecolor{uured}{rgb}{0.65, 0., 0.}
+#+LaTeX_HEADER: \DeclareMathOperator*{\E}{E}
+#+LaTeX_HEADER: \DeclareMathOperator*{\Var}{Var}
+
+#+title: Gazebo and ROS  - part 2
+#+date: 
+#+author: Kjartan Halvorsen
+
+* What do I want the listener to understand? 			   :noexport:
+** The purpose of Gazebo
+** How to interface Gazebo with ros and send commands to pioneer robot
+
+* What will the listeners do? 					   :noexport:
+** Implement/code simple model
+** Extend on some important concepts
+
+* Introduction
+** Overview
+   1. Position control of the Pioneer2dx robot
+   2. Adding a depth camera to the robot
+   3. Using the parameter server
+   4. Ideas for coming ROS seminars
+
+** Sources
+
+   - http://gazebosim.org/
+   - http://gazebosim.org/tutorials/?tut=ros_comm
+   - http://docs.ros.org/kinetic/api/gazebo_msgs/html/index-msg.html
+   - http://gazebosim.org/tutorials?tut=ros_depth_camera&cat=connect_ros
+
+
+* Simulating a robot in Gazebo
+
+** A simple controller (reusing code)
+
+   Download the code
+
+#+BEGIN_SRC shell
+~$ roscd pioneer_gazebo/src
+~/catkin_ws/src/pioneer_gazebo/src$ wget \
+> http://alfkjartan.github.io/files/robot_controller.cpp
+
+~/catkin_ws/src/pioneer_gazebo/src$ cd ..
+~/catkin_ws/src/pioneer_gazebo$ wget \
+> http://alfkjartan.github.io/files/CMakeLists.txt
+#+END_SRC
+
+
+** A simple controller - usage
+
+Build the package etc, then
+
+#+BEGIN_SRC shell
+~$ rosrun pioneer_gazebo pioneer_controller
+#+END_SRC
+
+* Adding a depth camera
+** Adding a depth camera to the pioneer
+   1. Make a new gazebo depth camera that publishes its data to ROS topics (add plugin)
+   2. Attach the depth camera to the pioneer2dx robot
+** Add ROS plugin to depth camera
+
+   1. In gazebo, insert a depth camera from the model database
+   2. Quit gazebo
+
+** Add ROS plugin to depth camera, contd
+   We now have the definition of the depth camera stored locally. Let's make a copy and modify.
+
+   3. [@3] Create a copy of the depth camera model
+      #+BEGIN_SRC shell
+~$ cd ~/.gazebo/models
+~$ cp -R depth_camera ros_depth_camera
+      #+END_SRC
+   6. Change the name of the model in the =model.config= file and the =model.sdf= file.
+   7. Add the =<plugin>= tag in the =model.sdf= file
+
+** Add ROS plugin to depth camera, contd
+   7. [@7] Add the =<plugin>= tag in the =model.sdf= file right before thex closing =</sensor>= tag
+      #+BEGIN_SRC xml
+	<plugin name="camera_plugin" filename="libgazebo_ros_openni_kinect.so">
+	  <baseline>0.2</baseline>
+	  <alwaysOn>true</alwaysOn>
+	  <updateRate>0.0</updateRate>
+	  <cameraName>camera</cameraName>
+	  <imageTopicName>/camera/depth/image_raw</imageTopicName>
+	  <cameraInfoTopicName>/camera/depth/camera_info</cameraInfoTopicName>
+	  <depthImageTopicName>/camera/depth/image_raw</depthImageTopicName>
+	  <depthImageInfoTopicName>/camera/depth/camera_info</depthImageInfoTopicName>
+	  <pointCloudTopicName>/camera/depth/points</pointCloudTopicName>
+	  <frameName>camera_link</frameName>
+          ...
+	  </plugin> 
+      #+END_SRC
+
+** Adding a depth camera to the pioneer
+   1. Make a new gazebo depth camera that publishes its data to ROS topics (add plugin)
+   2. *Attach the depth camera to the pioneer2dx robot*
+
+** Attaching the depth camera 
+   Modify the =pioneer.world= file
+   #+BEGIN_SRC shell
+~$ roscd pioneer_gazebo/worlds
+~/catkin_ws/src/pioneer_gazebo/worlds$ gedit pioneer.world
+   #+END_SRC
+
+   Add the depth camera to the definition of the pioneer model. Right before ending =</model>= tag:
+#+BEGIN_SRC xml
+      <include>
+	<uri>model://ros_depth_camera</uri>
+	<pose>0.2 0 0.2 0 0 0</pose>
+      </include>
+      <joint name="depth_camera_joint" type="fixed">
+	<child>ros_depth_camera::link</child>
+	<parent>chassis</parent>
+      </joint> 
+#+END_SRC 
+
+** Attaching the depth camera, contd
+
+   Save the world to a new file (e.g. =pioneer-depth-camera.world=), and modify the launch file:
+   #+BEGIN_SRC shell
+~/catkin_ws/src/pioneer_gazebo/worlds$ gedit ../launch/pioneer.launch
+   #+END_SRC
+   Change the world to load.
+
+** Attaching the depth camera, contd
+
+   Change the world to load.
+
+   #+BEGIN_SRC xml
+<launch>
+  <!-- Use the logic in empty_world.launch. Just launch another world -->
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">
+    <arg name="world_name" value="$(find pioneer_gazebo)/worlds/pioneer-depth-camera.world"/>
+    <!-- More params can be changed here -->
+  </include>
+</launch>
+   #+END_SRC
+
+* Using the depth camera
+** Data from the depth camera
+   Close any running gazebo and launch our new world
+   #+BEGIN_SRC shell
+~$ roslaunch pioneer_gazebo pioneer.launch 
+   #+END_SRC
+
+   Place some objects around the robot
+** Visualize data in =rviz=
+   Start =rviz=
+   #+BEGIN_SRC 
+~$ rosrun rviz rviz
+   #+END_SRC
+
+** Visualize data in =rviz=, contd
+
+#+BEGIN_CENTER 
+ \includegraphics[width=0.3\linewidth]{rviz.png}
+#+END_CENTER
+
+
+** Visualize data in =rviz=, contd
+   #+BEGIN_CENTER 
+    \includegraphics[width=\linewidth]{rviz-view.png}
+   #+END_CENTER
+
+
+* Move and watch
+
+** Look around
+
+   Make the robot rotate and see the changing view in =rviz=
+
+** Look around
+
+   Make the robot rotate and see the changing view in =rviz=
+
+#+BEGIN_SRC shell
+~$ rostopic pub /pioneer2dx/cmd_vel geometry_msgs/Twist \
+> '{angular: {z: 0.3}}'
+#+END_SRC
+
+* Using the parameter server
+
+** The ROS parameter server
+   Which of the following parameters is *not* available (hint: =rosparam=)
+
+#+BEGIN_SRC shell
+/camera/depth/image_raw/compressed/format
+/camera/imager_rate
+/gazebo/gravity_x
+/gazebo/gravity_y
+/gazebo/gravity_z
+/gazebo/max_contacts
+/gazebo/min_contacts
+/gazebo/time_step
+/rosdistro
+/rosversion
+#+END_SRC
+
+** Setting and getting parameters
+   What is the current setting of the gravity vector?
+   
+** Setting and getting parameters, contd
+
+   #+BEGIN_SRC shell
+~$ rosparam get /gazebo/gravity_z
+-9.8
+   #+END_SRC
+   
+** Setting and getting parameters, contd
+
+   #+BEGIN_SRC shell
+~$ rosparam set /gazebo/gravity_z -1.62
+   #+END_SRC
+   
+** Reading parameters in our own node
+#+BEGIN_SRC cpp
+  ...
+  ros::NodeHandle n;
+  ...
+
+  double Kv = 0.1; 
+  if (n.getParam("Kv", Kv)) {
+      ROS_INFO("Setting velocity gain to %f", Kv);
+  } else {
+      ROS_INFO("Velocity gain parameter not found");
+  }
+  ...
+#+END_SRC
+
+** Setting parameters in the launch file
+#+BEGIN_SRC xml
+<launch>
+  <!-- Use the logic in empty_world.launch. Just launch another world -->
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">
+    <arg name="world_name" value="$(find pioneer_gazebo)/worlds/pioneer-depth-camera.world"/>
+    <!-- More params can be changed here -->
+  </include>
+  <param name="tol" type="double" value="0.2" />
+  <param name="Kv" type="double" value="0.05" />
+  <param name="Ka" type="double" value="0.1" />
+</launch>
+#+END_SRC
+
+* Next steps
+** Ideas for future ROS seminars
+   - Point cloud library
+   - Navigation
+   - ROS control package

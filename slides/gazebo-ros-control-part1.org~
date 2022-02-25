@@ -1,0 +1,358 @@
+#+OPTIONS: toc:nil 
+#+BEAMER_FRAME_LEVEL: 2
+# #+LaTeX_CLASS: koma-article 
+#+LaTeX_CLASS: beamer
+#+LaTeX_CLASS_OPTIONS: [presentation,aspectratio=1610]
+#+BEAMER_THEME: default
+#+OPTIONS: H:2
+#+LaTeX_HEADER: \usepackage{khpreamble}
+#+LaTeX_HEADER: \usepackage{algorithm}
+#+LaTeX_HEADER: \usepackage{hyperref}
+#+LaTeX_HEADER: \usepackage{framed}
+#+LaTeX_HEADER: \usepackage[noend]{algpseudocode}
+#+LaTeX_HEADER: \usepackage{tikz,pgf}
+#+LaTeX_HEADER: \usetikzlibrary{shapes.geometric}
+
+#+LaTeX_HEADER: \newcommand{\sign}{\mathrm{sign}}
+#+LaTeX_HEADER: \renewcommand{\transp}{^{\mathrm{T}}}
+#+LaTeX_HEADER: \DeclareMathOperator*{\argmin}{arg\,min}
+#+LaTeX_HEADER: \DeclareMathOperator*{\argmax}{arg\,max}
+#+LaTeX_HEADER: \DeclareMathOperator*{\EXP}{E}
+#+LaTeX_HEADER: \DeclareMathOperator*{\COV}{cov}
+#+LaTeX_HEADER: \definecolor{uured}{rgb}{0.65, 0., 0.}
+#+LaTeX_HEADER: \DeclareMathOperator*{\E}{E}
+#+LaTeX_HEADER: \DeclareMathOperator*{\Var}{Var}
+
+#+title: Gazebo and ROS  - part 1
+# #+date: 
+#+author: Kjartan Halvorsen
+
+* What do I want the listener to understand? 			   :noexport:
+** The purpose of Gazebo
+** How to interface Gazebo with ros and send commands to pioneer robot
+
+* What will the listeners do? 					   :noexport:
+** Implement/code simple model
+** Extend on some important concepts
+
+* Introduction
+
+** Sources
+
+   - http://gazebosim.org/
+   - http://gazebosim.org/tutorials/?tut=ros_comm
+   - http://sdformat.org/
+   - http://docs.ros.org/kinetic/api/gazebo_msgs/html/index-msg.html
+
+** What is Gazebo?
+   A 3D simulation and visualization environment containing a physics engine.
+
+** Why use Gazebo?
+   It is a playground for your robot where you can test *actuators*, *sensors* and *control algorithms*.
+ 
+** Let's start with a fun example
+
+   Start =roscore=, =gazebo= and =gazebo_ros= in two separate terminals.
+
+*** Terminal 1
+    :PROPERTIES:
+    :BEAMER_env: block
+    :END:      
+#+BEGIN_SRC shell
+~$ roscore 
+#+END_SRC
+
+*** Terminal 2
+    :PROPERTIES:
+    :BEAMER_env: block
+    :END:      
+#+BEGIN_SRC shell
+~$ rosrun gazebo_ros gazebo
+#+END_SRC
+
+** What just happened
+
+   #+BEGIN_CENTER
+   \begin{tikzpicture}
+    \node (gazebo) {\includegraphics[width=45mm]{gazebo-gui-empty.png}};
+    \node[ellipse, draw, 
+          minimum height=15mm, minimum width=20mm, maximum width=22mm, right of=gazebo, 
+          node distance=7cm, text align=center] (gnode) {gazebo ros node};
+
+   \node[coordinate, right of=gnode, node distance=3cm] (tmp) {};
+   \node[above of=tmp, node distance=3cm] (topics) {\includegraphics[width=25mm]{chalkboard.png}};
+   \node[below of=tmp, node distance=3cm] (services) {\includegraphics[width=25mm]{chalkboard.png}};
+   \node[white, above of=tmp, node distance=35mm] {Topics};
+   \node[white, below of=tmp, node distance=25mm] {Services};
+
+   \draw[<->, thick] (gazebo) -- node[above] {Gazebo comm} (gnode);
+   \draw[<->, thick] (gnode) -- node[left] {ROS comm} (topics);
+   \draw[<-, thick] (gnode) -- node[left] {ROS comm} (services);
+
+   \end{tikzpicture}
+
+
+   #+END_CENTER
+** Add some junk to the world
+   #+BEGIN_SRC shell
+~$ rosrun gazebo_ros spawn_model -database coke_can \
+> -sdf -model coke_can1 -y 1 -x 0
+~$ rosrun gazebo_ros spawn_model -database coke_can \
+> -sdf -model coke_can2 -y 2 -x 0
+   #+END_SRC
+
+** See the physics engine in action
+   Pause the gazebo physics engine, then lift the first can up 50cm
+#+BEGIN_SRC shell
+~$ rosservice call /gazebo/pause_physics
+~$ rosservice call /gazebo/set_model_state \ 
+> '{model_state: { model_name: coke_can1, \
+> pose: { position: { x: 0., y: 1. ,z: 0.5 } }, \
+> reference_frame: world } }'
+#+END_SRC
+
+   and drop the can (start simulation in the gazebo gui)!
+
+** On your own: Drop the first can on top of the second can from two meters
+
+* Gazebo_ros fundamentals
+
+** Gazebo published topics
+   Which of the following topics are *not* available?
+
+#+BEGIN_SRC 
+/clock
+/gazebo/link_states
+/gazebo/model_states
+/gazebo/parameter_descriptions
+/gazebo/parameter_updates
+/gazebo/set_link_state
+/gazebo/set_model_state
+/gazebo/set_world_state
+/rosout
+/rosout_agg
+#+END_SRC
+
+** Gazebo services provided
+   Which of the following services are *not* available?
+#+BEGIN_SRC 
+/gazebo/apply_body_wrench
+/gazebo/clear_joint_forces
+/gazebo/get_joint_properties
+/gazebo/set_joint_force
+#+END_SRC
+
+   Hint: =rosservice=
+
+** Getting the coke can airborn
+   We can apply a *wrench* ( a force and torque pair) to any rigid body in the gazebo world
+
+#+BEGIN_SRC shell
+~$ rosservice info /gazebo/apply_body_wrench
+#+END_SRC
+
+   What arguments does the service take?
+
+** Getting the coke can airborn, contd
+   
+   If the can has a vertical launch velocity of $\unit{v_L}{\meter\per\second}$, it will reach a height where its potential energy is the same as the kinetic energy at launch. So to reach a height of $h=\unit{3}{m}$ we need a launch velocity of
+   \[ v_L = \]
+
+** Getting the coke can airborn, contd
+   
+   If the can has a vertical launch velocity of $\unit{v_L}{\meter\per\second}$, it will reach a height where its potential energy is the same as the kinetic energy at launch. So, to reach a height of $h=\unit{3}{m}$ we need a launch velocity of
+   \[ v_L = \sqrt{2gh} \approx \unit{7.7}{\meter\per\second}\]
+# 0.5mv^2 = mgh  => v = sqrt(2gh)
+
+** Kicking the coke can, theory
+   
+   Let's apply a constant, large force $F=F_v+mg$ under a short time $\tau=\unit{10}{\milli\second}$. Newton's second law gives
+   \[ \frac{d}{dt} (mv) = F_v + mg - mg \]
+
+\[ \int_0^\tau (\frac{d}{dt} mv) dt = \int_0^\tau F_v dt\]
+#+BEAMER: \pause
+   \[ mv_L - 0 = F_v \tau \]
+   The coke can has a mass of $m=\unit{0.39}{\kilo\gram}$. What force $F_v$ is needed?
+
+# F_v = mv_L/tau = 0.39*4.4/(10*10^-3) \approx 300N
+# F = F_v + mg = 303N
+
+
+** Kicking the coke can, for real (sort of)
+
+#+BEGIN_SRC shell
+~$ rosservice call /gazebo/pause_physics
+~$ rosservice call /gazebo/apply_body_wrench \
+> '{body_name: "coke_can2::link" , \ 
+> wrench: { force: { z: 300 } }, duration: 10000000 }'
+#+END_SRC
+
+
+* Introduce our own design
+** URDF - Unified Robotic Description Format
+
+Defining a robot
+
+[[https://youtu.be/pT5iQaG9aVU][Video]]
+
+** Spawning a model defined by a urdf file
+#+begin_src shell
+  ~$ rosrun gazebo_ros spawn_model -file ./furuta.urd -urdf -\
+  >   y 2 -model furuta
+#+end_src
+** Making the model move
+#+begin_src shell
+  ~$ rosservice call /gazebo/apply_joint_effort \
+  "joint_name: 'furuta::base_to_one_prox' effort: 10 duration: 10000000"
+#+end_src
+
+
+* Simulating a robot in Gazebo                                     :noexport:
+** Enter the pioneer2 robot
+
+** Create package
+
+   In =catkin_ws/src= run the command
+   #+BEGIN_SRC shell
+~/catkin_ws/src$ catkin_create_pkg pioneer_gazebo roscpp rospy std_msgs
+   #+END_SRC
+
+** Create =worlds= folder and download sdf-file
+   
+   #+BEGIN_SRC shell
+~/catkin_ws/src$ cd pioneer_gazebo
+~/catkin_ws/src/pioneer_gazebo$ mkdir worlds
+~/catkin_ws/src/pioneer_gazebo$ cd worlds
+~/catkin_ws/src/pioneer_gazebo/worlds$ wget \
+> http://alfkjartan.github.io/files/pioneer.world
+   #+END_SRC
+
+** Create =launch= folder and download launch-file
+   #+BEGIN_SRC shell
+~/catkin_ws/src/pioneer_gazebo$ mkdir launch
+~/catkin_ws/src/pioneer_gazebo$ cd launch
+~/catkin_ws/src/pioneer_gazebo/worlds$ wget \
+> http://alfkjartan.github.io/files/pioneer.launch
+   #+END_SRC
+   
+** Launch gazebo
+   #+BEGIN_SRC shell
+~/catkin_ws$ catkin build
+~/catkin_ws$ source devel/setup.bash
+   #+END_SRC
+
+   Shutdown any running gazebo and roscore. Then
+
+   #+BEGIN_SRC shell
+~/catkin_ws$ roslaunch pioneer_gazebo pioneer.launch
+   #+END_SRC
+
+** Making the Pioneer2 move
+
+   We could try to apply a wrench to one of the wheels, to see what happens
+
+#+BEGIN_SRC shell
+~$ rosservice call /gazebo/pause_physics
+~$ rosservice call /gazebo/apply_body_wrench \
+> '{body_name: "pioneer2dx::right_wheel" , \ 
+> wrench: { torque: { y: 7 } }, duration: 1000000000, \
+> reference_frame: right_wheel }'
+#+END_SRC
+
+** Making the Pioneer2 move, contd
+
+   If you messed up:
+#+BEGIN_SRC shell
+~$ rosservice call /gazebo/reset_world
+#+END_SRC
+
+   Instead, apply an effort to the joint: [[http://mirror.umd.edu/roswiki/doc/diamondback/api/gazebo/html/srv/ApplyJointEffort.html][apply_joint_effort]]
+  
+#+BEGIN_SRC shell
+~$ rosservice info /gazebo/apply_joint_effort
+#+END_SRC
+
+What arguments do we need to set? How do we reference the joint?
+
+** Making the Pioneer2 move, contd
+
+#+BEGIN_SRC shell
+~$ rosservice call /gazebo/pause_physics
+~$ rosservice call /gazebo/apply_joint_effort \ 
+> '{joint_name: "pioneer2dx::right_wheel_hinge", \
+> effort: 6, duration: {secs: 4} }'
+#+END_SRC
+
+** Moving the Pioneer2 the easy way
+
+Check the available topics:
+
+#+BEGIN_SRC shell
+/clock
+/gazebo/link_states
+/gazebo/model_states
+/gazebo/parameter_descriptions
+/gazebo/parameter_updates
+/gazebo/set_link_state
+/gazebo/set_model_state
+/pioneer2dx/cmd_vel
+/pioneer2dx/odom
+/rosout
+/rosout_agg
+/tf
+#+END_SRC
+
+** Moving the Pioneer2 the easy way, contd
+The =pioneer.world= file define a *plugin* for the robot model that provides the new topics =/pioneer2dx/cmd_vel= and =/pioneer2dx/odom=
+ 
+#+BEGIN_SRC xml
+	<plugin name="differential_drive_controller" filename="libgazebo_ros_diff_drive.so">
+	  <legacyMode>false</legacyMode>
+	  <alwaysOn>true</alwaysOn>
+	  <updateRate>100</updateRate>
+	  <leftJoint>left_wheel_hinge</leftJoint>
+	  <rightJoint>right_wheel_hinge</rightJoint>
+	  <wheelSeparation>0.60</wheelSeparation>
+	  <wheelDiameter>0.22</wheelDiameter>
+	  <torque>20</torque>
+	  <commandTopic>cmd_vel</commandTopic>
+	  <odometryTopic>odom</odometryTopic>
+	  <odometryFrame>odom</odometryFrame>
+	  <robotBaseFrame>base_footprint</robotBaseFrame>
+	</plugin>
+#+END_SRC
+
+** Moving the Pioneer2 the easy way, contd
+   We can publish to the =/pioneer2dx/cmd_vel= topic to make the robot move.
+
+#+BEGIN_SRC shell
+~$ rostopic pub /pioneer2dx/cmd_vel geometry_msgs/Twist \
+> '{linear: {x: 0.8}, angular: {z: 0.6}}'
+#+END_SRC
+
+   Try some different values. Be crazy :-)
+
+
+** A simple controller (reusing code)
+
+   Download the code
+
+#+BEGIN_SRC shell
+~$ roscd pioneer_gazebo/src
+~/catkin_ws/src/pioneer_gazebo/src$ wget \
+> http://alfkjartan.github.io/files/robot_controller.cpp
+
+~/catkin_ws/src/pioneer_gazebo/src$ cd ..
+~/catkin_ws/src/pioneer_gazebo$ wget \
+> http://alfkjartan.github.io/files/CMakeLists.txt
+#+END_SRC
+
+
+** A simple controller - usage
+
+Build the package etc, then
+
+#+BEGIN_SRC shell
+~$ rosrun pioneer_gazebo pioneer_controller
+#+END_SRC
+
