@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8"?>
+<robot name="arm" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!--parameters for gazebo properties-->
+  <xacro:property name="PI" value="3.1415926535897931"/>
+  
+  <xacro:property name="l0" value="0.1"/>
+  <xacro:property name="l1" value="0.15"/>
+  <xacro:property name="l2" value="0.8"/>
+  <xacro:property name="l3" value="0.9"/>
+  <xacro:property name="r" value="0.1"/>
+
+  <material name="mblue">
+    <color rgba="0.1 0.1 0.8 1"/>
+  </material>
+  <material name="mred">
+    <color rgba="0.8 0.1 0.1 1"/>
+  </material>
+  <material name="morange">
+    <color rgba="1 0.5 0.1 1"/>
+  </material>
+
+  <xacro:macro name="cylinder_inertia" params="m l r">
+    <inertia
+        ixx="${m/12.0 * (l*l + 3*r*r)}" ixy="0.0" ixz="0.0"
+        iyy="${m/12.0 * (l*l + 3*r*r)}" iyz="0.0"
+        izz="${m/2.0 * (r*r)}"/>
+  </xacro:macro>
+
+  <xacro:macro name="linkcylinder" params="m l r">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 ${0.5*l}"/>
+      <geometry>
+        <cylinder length="${l}" radius="${r}"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 ${0.5*l}"/>
+      <geometry>
+        <cylinder length="${l}" radius="${r}"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 ${0.5*l}"/>
+      <mass value="${m}"/>
+      <xacro:cylinder_inertia r="${r}" l="${l}" m="${m}"/>
+    </inertial> 
+  </xacro:macro>
+
+  
+  <link name="world"/>
+  
+  <link name="base_link">
+    <xacro:linkcylinder m="1" l="${l0}" r="${r}"/>
+  </link>
+
+  <link name="link_one">
+    <xacro:linkcylinder m="0.7" l="${l1}" r="${r}"/>
+  </link>
+
+  <link name="link_two">
+    <xacro:linkcylinder m="1" l="${l2}" r="${r}"/>
+  </link>
+
+  <link name="link_three">
+    <xacro:linkcylinder m="1" l="${l3}" r="${r}"/>
+  </link>
+
+
+  <joint name="world_to_base" type="fixed">
+    <parent link="world"/>
+    <child link="base_link"/>
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+  </joint>
+  
+  <joint name="shoulder_pan" type="continuous">
+    <parent link="base_link"/>
+    <child link="link_one"/>
+    <origin rpy="0 0 0 " xyz="0 0 ${1.05*l0}"/>
+    <axis xyz="0 0 1"/>
+  </joint>
+
+  <joint name="shoulder_tilt" type="continuous">
+    <parent link="link_one"/>
+    <child link="link_two"/>
+    <origin rpy="0 0 0 " xyz="0 -${2.2*r} ${l1}"/>
+    <axis xyz="0 1 0"/>
+  </joint>
+
+  <joint name="elbow" type="continuous">
+    <parent link="link_two"/>
+    <child link="link_three"/>
+    <origin rpy="0 ${0.5*PI} 0 " xyz="0 ${2.2*r} ${l2}"/>
+    <axis xyz="0 1 0"/>
+  </joint>
+
+    <transmission name="tran1">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="shoulder_pan">
+      <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="motor1">
+      <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+
+    <transmission name="tran2">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="shoulder_tilt">
+      <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="motor2">
+      <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+
+    </transmission>
+    <transmission name="tran3">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="elbow">
+      <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="motor3">
+      <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+
+  <gazebo reference="link_two">
+    <material>Gazebo/Blue</material>
+   </gazebo>
+   <gazebo reference="link_three">
+    <material>Gazebo/Red</material>
+   </gazebo>
+
+   <gazebo>
+  <plugin name="gazebo_ros_control" filename="libgazebo_ros_control.so">
+    <robotNamespace>/tresgdl</robotNamespace> 
+  </plugin>
+   </gazebo>
+   
+</robot>
+
