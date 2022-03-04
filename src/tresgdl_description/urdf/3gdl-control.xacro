@@ -31,13 +31,13 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 ${0.5*l}"/>
       <geometry>
-        <cylinder length="${l}" radius="${r}"/>
+        <cylinder length="${0.8*l}" radius="${r}"/>
       </geometry>
     </visual>
     <collision>
       <origin rpy="0 0 0" xyz="0 0 ${0.5*l}"/>
       <geometry>
-        <cylinder length="${l}" radius="${r}"/>
+        <cylinder length="${0.6*l}" radius="${r}"/>
       </geometry>
     </collision>
     <inertial>
@@ -51,7 +51,7 @@
   <link name="world"/>
   
   <link name="base_link">
-    <xacro:linkcylinder m="1" l="${l0}" r="${r}"/>
+    <xacro:linkcylinder m="1" l="${l0}" r="${1.6*r}"/>
   </link>
 
   <link name="link_one">
@@ -83,14 +83,14 @@
   <joint name="shoulder_tilt" type="continuous">
     <parent link="link_one"/>
     <child link="link_two"/>
-    <origin rpy="0 0 0 " xyz="0 -${2.2*r} ${l1}"/>
+    <origin rpy="0 0 0 " xyz="0 0 ${l1}"/>
     <axis xyz="0 1 0"/>
   </joint>
 
   <joint name="elbow" type="continuous">
     <parent link="link_two"/>
     <child link="link_three"/>
-    <origin rpy="0 ${0.5*PI} 0 " xyz="0 ${2.2*r} ${l2}"/>
+    <origin rpy="0 ${0.5*PI} 0 " xyz="0 0 ${l2}"/>
     <axis xyz="0 1 0"/>
   </joint>
 
