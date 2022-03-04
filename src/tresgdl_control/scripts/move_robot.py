@@ -35,6 +35,7 @@ class RobotController:
         self.initial_state = np.zeros(3)
         self.current_state = np.zeros(3)
         self.goal = 0 # Variable set by movecommand. Determines where the robot moves
+        self.at_goal = False
 
         self.control_state = 0 # Used for implementing a simple finite state machine
         
@@ -45,6 +46,7 @@ class RobotController:
         self.goal = data.data # Index into the list of goal states
         self.initial_state[:] = self.current_state # Copy current state to initial state
         self.control_state = 0
+        self.at_goal = False
                   
     def _move_to_point_callback(self, data):
         self.goal_point[:] = [data.x, data.y, data.z]
@@ -62,17 +64,28 @@ class RobotController:
                 self.move_tcp_to_point()
 
             self.rate.sleep()
+
     def move_to_goal(self):
         try:
             jointangles = RobotController.goal_states[self.goal]
         except IndexError:
             pass
 
-        self.sh_pan.publish(jointangles[0])
-        self.sh_tilt.publish(jointangles[1])
-        self.elbow.publish(jointangles[2])
-        self.rate.sleep()
+        n = 5 # Number of intermediate points
+        delta_theta = (jointangles - self.initial_state)/n
 
+        
+        wait = 0.2
+        for i in range(n):
+            self.sh_pan.publish(jointangles[0] + (i+1)*delta_theta[0])
+            self.sh_tilt.publish(jointangles[1] + (i+1)*delta_theta[1])
+            self.elbow.publish(jointangles[2] + (i+1)*delta_theta[2])
+            # Wait for wait seconds
+            now = rospy.get_time()
+            while rospy.get_time() < (now + wait):
+                self.rate.sleep()
+        self.at_goal = True
+        
     def move_tcp_to_point(self):
         '''
         Solves inverse kinematics problem, then moves the robot arm so the tool center point
