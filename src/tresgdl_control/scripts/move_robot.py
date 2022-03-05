@@ -9,11 +9,12 @@ from geometry_msgs.msg import Vector3
 
 class RobotController:
 
-    goal_states = [[0, 0, 0],
-                   [np.pi/2, 0, 0],
-                   [0, np.pi/4, np.pi/4]]
+    goal_states = [[0, 0, 0, 0, 0],
+                   [np.pi/2, 0, 0, 0],
+                   [0, np.pi/4, np.pi/4, 0.03, 0.03]]
 
-    jointnames = ['shoulder_pan', 'shoulder_tilt', 'elbow']
+    jointnames = ['shoulder_pan', 'shoulder_tilt', 'elbow',
+                  'arm_to_gripper_one', 'arm_to_gripper_two']
 
     link0_length = 0.1 # From floor to top of base
     link1_length = 0.15 # From center of joint shoulder_pan to joint shoulder_tilt
@@ -31,9 +32,9 @@ class RobotController:
         move2point_sub = rospy.Subscriber('/move_to_point', Vector3,  self._move_to_point_callback)
         jointstate_sub = rospy.Subscriber('/tresgdl/joint_states', JointState,  self._js_callback,
                                           queue_size=1)
-        self.goal_point = np.zeros(3)
-        self.initial_state = np.zeros(3)
-        self.current_state = np.zeros(3)
+        self.goal_point = np.zeros(len(RobotController.jointnames))
+        self.initial_state = np.zeros(len(RobotController.jointnames))
+        self.current_state = np.zeros(len(RobotController.jointnames))
         self.goal = 0 # Variable set by movecommand. Determines where the robot moves
         self.at_goal = False
 
