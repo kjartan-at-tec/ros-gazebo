@@ -29,7 +29,7 @@ class RobotController:
                                       Float64, queue_size=10)
         movecommand_sub = rospy.Subscriber('/movecommand', Int32,  self._move_callback)
         move2point_sub = rospy.Subscriber('/move_to_point', Vector3,  self._move_to_point_callback)
-        jointstate_sub = rospy.Subscriber('/tresgdl/jointstate', JointState,  self._js_callback,
+        jointstate_sub = rospy.Subscriber('/tresgdl/joint_states', JointState,  self._js_callback,
                                           queue_size=1)
         self.goal_point = np.zeros(3)
         self.initial_state = np.zeros(3)
@@ -55,7 +55,7 @@ class RobotController:
     def _js_callback(self, data):
         for i,name in enumerate(data.name):
             self.current_state[RobotController.jointnames.index(name)] = data.position[i]
-
+        #print(self.current_state)
     def run_controller(self):
         while not rospy.is_shutdown():
             if self.control_state == 0:
@@ -120,7 +120,7 @@ class RobotController:
                       [0, 1, 2*T, 3*T**2]])
         b = np.array([0, 1, 0, 0])
         a = np.linalg.solve(A, b)
-        
+        #print(a)
         
         delta_theta = (jointangles - self.initial_state)
 
@@ -129,7 +129,8 @@ class RobotController:
             # Find interpolated value, then publish it
             t = rospy.get_time() - now
             tvec = np.array([1, t, t**2, t**3])
-            beta = np.dot(a, t)
+            beta = float(np.dot(a, tvec))
+            #print(beta)
             self.sh_pan.publish(self.initial_state[0] + beta*delta_theta[0])
             self.sh_tilt.publish(self.initial_state[1] + beta*delta_theta[1])
             self.elbow.publish(self.initial_state[2] + beta*delta_theta[2])
