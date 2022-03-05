@@ -66,6 +66,32 @@
     <xacro:linkcylinder m="1" l="${l3}" r="${r}"/>
   </link>
 
+   <link name="gripper_one">
+     <inertial>
+        <origin xyz="0 0 0.05" rpy="0 0 0"/>
+     <mass value="0.05"/>
+     <inertia ixx="100"  ixy="0"  ixz="0" iyy="100" iyz="0" izz="100" />
+   </inertial>
+
+   <visual>
+        <origin xyz="0 0 0.05" rpy="0 0 0"/>
+      <geometry>
+       <box size="0.02 0.04 0.1" />
+     </geometry>
+     <material name="Cyan">
+       <color rgba="0 1.0 1.0 1.0"/>
+     </material>
+   </visual>
+
+   <collision>
+     <origin xyz="0 0 0" rpy="0 0 0"/>
+        <origin xyz="0 0 0.05" rpy="0 0 0"/>
+      <geometry>
+       <box size="0.02 0.04 0.1" />
+     </geometry>
+   </collision>
+  </link>
+
 
   <joint name="world_to_base" type="fixed">
     <parent link="world"/>
@@ -92,6 +118,14 @@
     <child link="link_three"/>
     <origin rpy="0 ${0.5*PI} 0 " xyz="0 0 ${l2}"/>
     <axis xyz="0 1 0"/>
+  </joint>
+
+  <joint name="arm_to_gripper_one" type="prismatic">
+    <parent link="link_three"/>
+    <child link="gripper_one"/>
+    <origin rpy="0 0 0 " xyz="0.00 -0.05 ${l3}"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="0" upper="0.03" effort="10" velocity="0.5"/>
   </joint>
 
     <transmission name="tran1">
@@ -122,6 +156,18 @@
       <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
     </joint>
     <actuator name="motor3">
+      <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+
+
+    <transmission name="trang1">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="arm_to_gripper_one">
+      <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="motor4">
       <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
       <mechanicalReduction>1</mechanicalReduction>
     </actuator>
