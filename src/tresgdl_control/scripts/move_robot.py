@@ -59,7 +59,7 @@ class RobotController:
     def run_controller(self):
         while not rospy.is_shutdown():
             if self.control_state == 0:
-                self.move_to_goal()
+                self.move_smoothly()
             elif self.control_state == 1:
                 self.move_tcp_to_point()
 
@@ -71,15 +71,19 @@ class RobotController:
         except IndexError:
             pass
 
+        if self.at_goal:
+            return
+
+        
         n = 5 # Number of intermediate points
         delta_theta = (jointangles - self.initial_state)/n
 
         
         wait = 0.2
         for i in range(n):
-            self.sh_pan.publish(jointangles[0] + (i+1)*delta_theta[0])
-            self.sh_tilt.publish(jointangles[1] + (i+1)*delta_theta[1])
-            self.elbow.publish(jointangles[2] + (i+1)*delta_theta[2])
+            self.sh_pan.publish(self.initial_state[0] + (i+1)*delta_theta[0])
+            self.sh_tilt.publish(self.initial_state[1] + (i+1)*delta_theta[1])
+            self.elbow.publish(self.initial_state[2] + (i+1)*delta_theta[2])
             # Wait for wait seconds
             now = rospy.get_time()
             while rospy.get_time() < (now + wait):
@@ -98,6 +102,42 @@ class RobotController:
         '''
         Uses interpolation to move the arm smoothly from the initial state to the goal state.
         '''
+        try:
+            jointangles = RobotController.goal_states[self.goal]
+        except IndexError:
+            pass
+
+        if self.at_goal:
+            return
+
+        T = 1
+        # Find cubic interpolation parameters by solving
+        # A * a = b
+        
+        A = np.array([[1, 0, 0, 0],
+                      [1, T, T**2, T**3],
+                      [0, 1, 0, 0],
+                      [0, 1, 2*T, 3*T**2]])
+        b = np.array([0, 1, 0, 0])
+        a = np.linalg.solve(A, b)
+        
+        
+        delta_theta = (jointangles - self.initial_state)
+
+        now = rospy.get_time()
+        while rospy.get_time() < (now + T):
+            # Find interpolated value, then publish it
+            t = rospy.get_time() - now
+            tvec = np.array([1, t, t**2, t**3])
+            beta = np.dot(a, t)
+            self.sh_pan.publish(self.initial_state[0] + beta*delta_theta[0])
+            self.sh_tilt.publish(self.initial_state[1] + beta*delta_theta[1])
+            self.elbow.publish(self.initial_state[2] + beta*delta_theta[2])
+
+            self.rate.sleep()
+        
+        self.at_goal = True
+        
 
         # Your code here
 
