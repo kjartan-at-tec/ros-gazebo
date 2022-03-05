@@ -6,7 +6,7 @@
 
   <!-- load the controllers -->
   <node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false"
-    output="screen" ns="/tresgdl" args="shoulder_pan_position_controller shoulder_tilt_position_controller elbow_position_controller joint_state_controller"/>
+    output="screen" ns="/tresgdl" args="shoulder_pan_position_controller shoulder_tilt_position_controller elbow_position_controller joint_state_controller gripper_one_position_controller"/>
 
   <!-- Load the controller to move the arm -->
 <!--  <node name="move2goal" pkg="tresgdl_control" type="move_robot.py" args="" /> -->
